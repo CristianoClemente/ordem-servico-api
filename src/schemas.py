@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 import datetime
 
 class UserCreate(BaseModel):
@@ -24,3 +25,12 @@ class OrdemCreate(BaseModel):
     status: str = "Pendente"
     date_created: datetime.datetime = datetime.datetime.now
     date_updated: datetime.datetime = datetime.datetime.now
+    
+class OrdemStatusUpdate(BaseModel):
+    status: str
+
+class OrdemUpdate(BaseModel):
+    nome_servico: Optional[str] = None
+    descricao_servico: Optional[str] = None
+    valor: Optional[float] = None
+    status: Optional[str] = None
