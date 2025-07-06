@@ -6,11 +6,26 @@ import schemas
 from models import User, Client, Ordem
 from datetime import timedelta
 from typing import List
+from fastapi.middleware.cors import CORSMiddleware
 
-# Criar tabelas ao iniciar a aplicação
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+origins = [
+    "http://localhost",
+    "http://localhost:5173", # A porta onde sua aplicação React está rodando
+    # Você pode adicionar outras origens aqui se sua aplicação React for rodar em outro domínio/porta
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["*"],
+ )
 
 def get_db():
     db = SessionLocal()
@@ -60,7 +75,7 @@ def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
 def create_client(
     client: schemas.ClientCreate,
     db: Session = Depends(get_db),
-    username: str = Depends(auth.get_current_user)  # Obtém o usuário autenticado
+    username: str = Depends(auth.get_current_user)  
 ):
     db_user = db.query(User).filter(User.username == username).first()
     if not db_user:
@@ -77,12 +92,10 @@ def get_all_clients(db: Session = Depends(get_db)):
     clients = db.query(Client).all()
     return clients
 
-# ==================== NOVAS ROTAS ====================
-
 @app.get("/my-clients/")
 def get_my_clients(
     db: Session = Depends(get_db),
-    username: str = Depends(auth.get_current_user)  # Obtém o usuário autenticado
+    username: str = Depends(auth.get_current_user)  
 ):
     """Retorna apenas os clientes do usuário autenticado"""
     db_user = db.query(User).filter(User.username == username).first()
@@ -96,21 +109,21 @@ def get_my_clients(
 def create_ordem(
     ordem: schemas.OrdemCreate,
     db: Session = Depends(get_db),
-    username: str = Depends(auth.get_current_user)  # Obtém o usuário autenticado
+    username: str = Depends(auth.get_current_user)  
 ):
     """Cria uma nova ordem de serviço"""
     db_user = db.query(User).filter(User.username == username).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
-    # Verifica se o cliente existe e pertence ao usuário
+    # Verifica se o cliente existe
     db_client = db.query(Client).filter(
         Client.id == ordem.client_id,
         Client.user_id == db_user.id
     ).first()
     
     if not db_client:
-        raise HTTPException(status_code=404, detail="Cliente não encontrado ou não pertence ao usuário")
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
     
     db_ordem = Ordem(
         client_id=ordem.client_id,
@@ -127,7 +140,7 @@ def create_ordem(
 @app.get("/ordens/")
 def get_my_ordens(
     db: Session = Depends(get_db),
-    username: str = Depends(auth.get_current_user)  # Obtém o usuário autenticado
+    username: str = Depends(auth.get_current_user)  
 ):
     """Retorna todas as ordens do usuário autenticado"""
     db_user = db.query(User).filter(User.username == username).first()
@@ -146,21 +159,21 @@ def update_ordem_status(
     ordem_id: int,
     status: str,
     db: Session = Depends(get_db),
-    username: str = Depends(auth.get_current_user)  # Obtém o usuário autenticado
+    username: str = Depends(auth.get_current_user) 
 ):
     """Atualiza o status de uma ordem de serviço"""
     db_user = db.query(User).filter(User.username == username).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
-    # Verifica se a ordem existe e pertence ao usuário
+    # Verifica se a ordem existe
     db_ordem = db.query(Ordem).join(Client).filter(
         Ordem.id == ordem_id,
         Client.user_id == db_user.id
     ).first()
     
     if not db_ordem:
-        raise HTTPException(status_code=404, detail="Ordem não encontrada ou não pertence ao usuário")
+        raise HTTPException(status_code=404, detail="Ordem não encontrada")
     
     # Valida status permitidos
     status_validos = ["Pendente", "Em Andamento", "Concluído", "Cancelado"]
@@ -170,27 +183,27 @@ def update_ordem_status(
     db_ordem.status = status
     db.commit()
     
-    return {"msg": "Status da ordem atualizado com sucesso"}
+    return {"msg": "Status atualizado com sucesso"}
 
 @app.get("/client/{client_id}/ordens/")
 def get_ordens_by_client(
     client_id: int,
     db: Session = Depends(get_db),
-    username: str = Depends(auth.get_current_user)  # Obtém o usuário autenticado
+    username: str = Depends(auth.get_current_user) 
 ):
     """Retorna todas as ordens de um cliente específico"""
     db_user = db.query(User).filter(User.username == username).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
-    # Verifica se o cliente existe e pertence ao usuário
+    # Verifica se o cliente existe
     db_client = db.query(Client).filter(
         Client.id == client_id,
         Client.user_id == db_user.id
     ).first()
     
     if not db_client:
-        raise HTTPException(status_code=404, detail="Cliente não encontrado ou não pertence ao usuário")
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
     
     # Busca todas as ordens do cliente
     ordens = db.query(Ordem).filter(Ordem.client_id == client_id).all()
@@ -210,29 +223,29 @@ def update_ordem(
     ordem_id: int,
     ordem_update: schemas.OrdemUpdate,
     db: Session = Depends(get_db),
-    username: str = Depends(auth.get_current_user)  # Obtém o usuário autenticado
+    username: str = Depends(auth.get_current_user)  
 ):
     """Edita uma ordem de serviço completa"""
     db_user = db.query(User).filter(User.username == username).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
-    # Verifica se a ordem existe e pertence ao usuário
+    # Verifica se a ordem existe e se pertence ao usuário
     db_ordem = db.query(Ordem).join(Client).filter(
         Ordem.id == ordem_id,
         Client.user_id == db_user.id
     ).first()
     
     if not db_ordem:
-        raise HTTPException(status_code=404, detail="Ordem não encontrada ou não pertence ao usuário")
+        raise HTTPException(status_code=404, detail="Ordem não encontrada")
     
-    # Valida status se fornecido
+    # Valida status
     if ordem_update.status:
         status_validos = ["Pendente", "Em Andamento", "Concluído", "Cancelado"]
         if ordem_update.status not in status_validos:
             raise HTTPException(status_code=400, detail=f"Status inválido. Use: {', '.join(status_validos)}")
     
-    # Atualiza apenas os campos fornecidos
+    # Atualiza oredem de serviço
     if ordem_update.nome_servico is not None:
         db_ordem.nome_servico = ordem_update.nome_servico
     if ordem_update.descricao_servico is not None:
@@ -250,7 +263,7 @@ def update_ordem(
 def delete_client(
     client_id: int,
     db: Session = Depends(get_db),
-    username: str = Depends(auth.get_current_user)  # Obtém o usuário autenticado
+    username: str = Depends(auth.get_current_user) 
 ):
     """Remove um cliente e todas as suas ordens"""
     db_user = db.query(User).filter(User.username == username).first()
@@ -264,7 +277,7 @@ def delete_client(
     ).first()
     
     if not db_client:
-        raise HTTPException(status_code=404, detail="Cliente não encontrado ou não pertence ao usuário")
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
     
     # Remove todas as ordens do cliente primeiro
     db.query(Ordem).filter(Ordem.client_id == client_id).delete()
@@ -273,4 +286,4 @@ def delete_client(
     db.delete(db_client)
     db.commit()
     
-    return {"msg": "Cliente e suas ordens removidos com sucesso"}
+    return {"msg": "Cliente excluido com sucesso"}
